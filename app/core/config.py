@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     SMTP_USER: str = os.getenv("SMTP_USER")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD")
     ZAIA_API_KEY: str = os.getenv("ZAIA_API_KEY")
-    ZAIA_API_URL: str = os.getenv("ZAIA_API_URL", "https://api.zaia.app/v1.1")
+    ZAIA_API_URL: str = os.getenv("ZAIA_API_URL", "https://api.zaia.app")
     ZAIA_AGENT_ID: int = int(os.getenv("ZAIA_AGENT_ID", "34790"))
     ASAAS_API_KEY: str = os.getenv("ASAAS_API_KEY")
     ASAAS_BASE: str = os.getenv("ASAAS_BASE", "https://api.asaas.com/v3")
