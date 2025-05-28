@@ -1,8 +1,13 @@
 from pydantic import BaseModel
+from typing import Optional, Dict, Any
 
 class WebhookPayload(BaseModel):
-    from_: str
+    phone: str
     type: str
-    body: str = None
-    audio_url: str = None
-    image_url: str = None 
+    text: Optional[str] = None
+    audio: Optional[Dict[str, Any]] = None
+    image: Optional[Dict[str, Any]] = None
+    document: Optional[Dict[str, Any]] = None
+    instanceId: Optional[str] = None
+    messageId: Optional[str] = None
+    timestamp: Optional[int] = None 
