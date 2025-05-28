@@ -1,5 +1,4 @@
-from fastapi import APIRouter
-from app.models.webhook_models import WebhookPayload
+from fastapi import APIRouter, Request
 from app.services.zaia_service import detectar_intencao
 from app.services.flexge_service import processar_mastery_test
 from app.services.gramatica_service import processar_duvida_gramatical
@@ -15,33 +14,38 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/zapi")
-async def webhook_zapi(payload: WebhookPayload):
+async def webhook_zapi(request: Request):
     try:
-        logger.info(f"Recebido webhook do Z-API: {payload.dict()}")
+        payload = await request.json()
+        logger.info(f"Recebido webhook do Z-API: {payload}")
         
-        numero = payload.phone
-        tipo = payload.type
-        texto = payload.text if payload.text else ""
+        numero = payload.get("phone")
+        tipo = payload.get("type")
+        texto = payload.get("text", "")
+        
+        if not numero or not tipo:
+            logger.error("Payload inválido: faltando campos obrigatórios")
+            return {"status": "error", "message": "Payload inválido"}
         
         if tipo not in ["message", "audio", "image", "document"]:
             logger.info(f"Tipo de mensagem não suportado: {tipo}")
             return {"status": "ignored"}
             
         # Se for áudio, pegar a URL
-        if tipo == "audio" and payload.audio:
-            audio_url = payload.audio.get("url")
+        if tipo == "audio" and "audio" in payload:
+            audio_url = payload["audio"].get("url")
             if audio_url:
                 texto = await processar_voz(audio_url)
         
         # Se for imagem, pegar a URL
-        elif tipo == "image" and payload.image:
-            image_url = payload.image.get("url")
+        elif tipo == "image" and "image" in payload:
+            image_url = payload["image"].get("url")
             if image_url:
                 texto = f"[Imagem recebida: {image_url}]"
         
         # Se for documento, pegar a URL
-        elif tipo == "document" and payload.document:
-            document_url = payload.document.get("url")
+        elif tipo == "document" and "document" in payload:
+            document_url = payload["document"].get("url")
             if document_url:
                 texto = f"[Documento recebido: {document_url}]"
 
