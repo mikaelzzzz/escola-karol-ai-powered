@@ -35,8 +35,8 @@ ZAPI_TOKEN=your_zapi_token
 ZAPI_SECURITY_TOKEN=your_zapi_security_token
 
 # Notion Configuration
-NOTION_TOKEN=your_notion_token
-NOTION_DB_ID=your_notion_database_id
+NOTION_API_KEY=your_notion_api_key
+NOTION_DATABASE_ID=your_notion_database_id
 """
 
 def create_env_file():

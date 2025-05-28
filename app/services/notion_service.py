@@ -23,6 +23,7 @@ class NotionService:
         try:
             # Formatar número para garantir consistência (remover caracteres especiais)
             phone_formatted = ''.join(filter(str.isdigit, phone))
+            print(f"Buscando aluno no Notion com telefone: {phone} -> formatado: {phone_formatted}")
             
             # Construir a query para o Notion
             url = f"{self.base_url}/databases/{self.database_id}/query"
@@ -35,20 +36,31 @@ class NotionService:
                 }
             }
             
+            print(f"URL da consulta: {url}")
+            print(f"Payload da consulta: {json.dumps(payload, indent=2)}")
+            print(f"Headers: {self._get_headers()}")
+            
             response = requests.post(
                 url,
                 headers=self._get_headers(),
                 json=payload
             )
+            
+            print(f"Status da resposta: {response.status_code}")
+            print(f"Resposta completa: {response.text}")
+            
             response.raise_for_status()
             
             data = response.json()
             if not data.get("results"):
+                print("Nenhum resultado encontrado no Notion")
                 return None
                 
             # Pegar o primeiro resultado
             student = data["results"][0]
             properties = student["properties"]
+            
+            print(f"Propriedades encontradas: {list(properties.keys())}")
             
             # Mapear os dados do aluno com os campos corretos
             return {
