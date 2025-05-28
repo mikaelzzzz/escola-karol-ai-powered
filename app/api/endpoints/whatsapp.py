@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from app.services.whatsapp_service import WhatsAppService
 from app.services.flexge_service import FlexgeService
 from app.services.elevenlabs_service import text_to_speech
+from app.core.config import settings
 from typing import Optional
 from pydantic import BaseModel
 import json
@@ -89,7 +90,8 @@ async def zapi_webhook(request: Request):
         resposta, usar_audio = await service.process_with_zaia(
             resultado.get("message", ""),
             resultado.get("aluno"),
-            resultado.get("contexto")
+            resultado.get("contexto"),
+            resultado.get("phone", webhook_data.get("phone"))
         )
         
         # Enviar resposta

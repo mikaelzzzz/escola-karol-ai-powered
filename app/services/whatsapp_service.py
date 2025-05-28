@@ -124,7 +124,7 @@ class WhatsAppService:
             print(f"Erro ao extrair texto da mídia: {str(e)}")
             return f"Recebi seu {tipo}, mas não consegui analisar o conteúdo. Pode me explicar do que se trata?", "erro"
             
-    async def process_with_zaia(self, message: str, aluno: Optional[Dict] = None, contexto: Optional[str] = None) -> Tuple[str, bool]:
+    async def process_with_zaia(self, message: str, aluno: Optional[Dict] = None, contexto: Optional[str] = None, phone: Optional[str] = None) -> Tuple[str, bool]:
         """
         Processa mensagem com a Zaia e retorna resposta contextualizada
         Retorna uma tupla (resposta, usar_audio)
@@ -137,24 +137,82 @@ class WhatsAppService:
                 return await self.processar_erro_flexge(message, aluno), False
             
             # Identificar intenção da mensagem
-            if "prova" in message.lower() and "erro" in message.lower():
+            message_lower = message.lower()
+            
+            # Verificar intenções específicas
+            if "prova" in message_lower or "teste" in message_lower or "mastery" in message_lower:
                 return await self.processar_duvida_prova(message, aluno), False
-            elif "boleto" in message.lower():
+            elif "boleto" in message_lower or "pagamento" in message_lower:
                 return await self.processar_duvida_boleto(message, aluno), False
+            elif any(greeting in message_lower for greeting in ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite"]):
+                # Resposta de saudação personalizada
+                nome = aluno.get("nome", "").split()[0] if aluno else ""
+                return f"Olá {nome}! 😊 Sou a Karol, sua assistente virtual. Como posso ajudar você hoje? Posso auxiliar com:\n\n📚 Dúvidas sobre o Flexge\n📝 Informações sobre suas provas\n💳 Questões sobre pagamentos\n📖 Explicações gramaticais\n\nÉ só me dizer o que precisa!", False
             else:
-                # Processar com Zaia normalmente
-                url = f"{settings.ZAIA_API_URL}/chat/{settings.ZAIA_AGENT_ID}/message"
-                payload = {"message": message}
-                headers = {"Authorization": f"Bearer {settings.ZAIA_API_KEY}"}
-                
-                response = requests.post(url, json=payload, headers=headers)
-                response.raise_for_status()
-                
-                return response.json().get("response", "Desculpe, não consegui processar sua mensagem."), True
+                # Tentar processar com Zaia
+                try:
+                    # Usar a API da Zaia para gerar resposta
+                    url = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-message/create"
+                    
+                    # Criar um ID único para o chat baseado no número do WhatsApp
+                    chat_external_id = f"whatsapp_{aluno.get('telefone', 'unknown')}" if aluno else f"whatsapp_{phone or 'unknown'}"
+                    
+                    payload = {
+                        "agentId": settings.ZAIA_AGENT_ID,
+                        "externalGenerativeChatId": hash(chat_external_id) % 1000000,  # Gerar um ID numérico baseado no telefone
+                        "externalGenerativeChatExternalId": chat_external_id,
+                        "prompt": message,
+                        "streaming": False,
+                        "asMarkdown": False,
+                        "custom": {
+                            "whatsapp": aluno.get("telefone", "") if aluno else "",
+                            "nome": aluno.get("nome", "") if aluno else "",
+                            "email": aluno.get("email", "") if aluno else ""
+                        }
+                    }
+                    
+                    headers = {
+                        "Authorization": f"Bearer {settings.ZAIA_API_KEY}",
+                        "Content-Type": "application/json"
+                    }
+                    
+                    response = requests.post(url, json=payload, headers=headers, timeout=30)
+                    
+                    if response.status_code == 200:
+                        response_data = response.json()
+                        # A resposta pode estar em diferentes campos dependendo da configuração
+                        resposta_texto = response_data.get("message", "") or response_data.get("content", "") or response_data.get("response", "")
+                        if resposta_texto:
+                            return resposta_texto, True
+                    
+                    # Se não conseguiu com a Zaia, usar GPT-4 como fallback
+                    nome = aluno.get("nome", "").split()[0] if aluno else ""
+                    prompt = f"""Você é a Karol, assistente virtual da Escola Karol Language Learning.
+                    Aluno: {nome}
+                    Mensagem do aluno: {message}
+                    
+                    Responda de forma amigável e profissional, sempre tentando ajudar.
+                    Se não souber responder, sugira opções como: verificar provas, boletos, dúvidas sobre o Flexge, etc."""
+                    
+                    response = self.openai_client.chat.completions.create(
+                        model="gpt-4",
+                        messages=[
+                            {"role": "system", "content": "Você é a Karol, assistente virtual educacional. Seja amigável, profissional e sempre tente ajudar."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        max_tokens=300
+                    )
+                    
+                    return response.choices[0].message.content, False
+                    
+                except Exception as e:
+                    print(f"Erro ao processar mensagem: {str(e)}")
+                    # Se tudo falhar, usar resposta padrão
+                    return "Desculpe, estou com dificuldades técnicas no momento. Por favor, tente novamente em alguns instantes ou seja mais específico sobre o que precisa (ex: 'quero ver minha prova', 'preciso do boleto', etc.)", False
                 
         except Exception as e:
             print(f"Erro ao processar com Zaia: {str(e)}")
-            return "Desculpe, estou com dificuldades para processar sua mensagem no momento.", False
+            return "Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.", False
             
     async def transcrever_audio(self, audio_url: str) -> str:
         """
@@ -193,11 +251,11 @@ class WhatsAppService:
         Processa dúvida específica sobre prova
         """
         try:
-            if not aluno or not aluno.get("_id"):
+            if not aluno or not aluno.get("email"):
                 return "Desculpe, não consegui identificar seus dados de aluno."
                 
             flexge_service = FlexgeService()
-            provas = await flexge_service.buscar_detalhes_prova(aluno["_id"])
+            provas = await flexge_service.buscar_detalhes_prova(aluno["email"])
             
             if not provas:
                 return "Não encontrei registros recentes de provas no seu histórico."
@@ -331,11 +389,15 @@ class WhatsAppService:
         """
         try:
             url = f"{self.base_url}/send-text"
+            headers = {
+                "Content-Type": "application/json",
+                "Client-Token": settings.ZAPI_SECURITY_TOKEN
+            }
             payload = {
                 "phone": phone,
                 "message": message
             }
-            response = requests.post(url, json=payload)
+            response = requests.post(url, json=payload, headers=headers)
             response.raise_for_status()
             return True
         except Exception as e:
@@ -348,6 +410,10 @@ class WhatsAppService:
         """
         try:
             url = f"{self.base_url}/send-audio"
+            headers = {
+                "Content-Type": "application/json",
+                "Client-Token": settings.ZAPI_SECURITY_TOKEN
+            }
             audio_base64 = base64.b64encode(audio_data).decode('utf-8')
             
             payload = {
@@ -355,7 +421,7 @@ class WhatsAppService:
                 "audio": audio_base64
             }
             
-            response = requests.post(url, json=payload)
+            response = requests.post(url, json=payload, headers=headers)
             response.raise_for_status()
             return True
         except Exception as e:

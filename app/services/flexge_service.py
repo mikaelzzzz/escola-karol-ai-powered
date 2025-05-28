@@ -31,6 +31,46 @@ class FlexgeService:
         """
         return await self.notion_service.buscar_aluno_por_email(email)
 
+    async def buscar_aluno_flexge_por_email(self, email: str):
+        """
+        Busca um aluno no Flexge pelo email
+        """
+        try:
+            page = 1
+            while True:
+                url = f"{self.base_url}/students?page={page}"
+                resp = requests.get(url, headers=self.generate_headers(), timeout=10)
+                if resp.status_code != 200:
+                    break
+                    
+                data = resp.json()
+                if not data.get("docs"):
+                    break
+                    
+                # Procurar aluno pelo email
+                for student in data["docs"]:
+                    if student.get("email", "").lower() == email.lower():
+                        return {
+                            "id": student["_id"],
+                            "name": student.get("name", ""),
+                            "email": student.get("email", ""),
+                            "level": student.get("level", ""),
+                            "enabled": student.get("enabled", True),
+                            "lastAccess": student.get("lastAccess", "")
+                        }
+                
+                # Se não há mais páginas
+                if not data.get("hasNextPage", False):
+                    break
+                    
+                page += 1
+                
+            return None
+            
+        except Exception as e:
+            print(f"Erro ao buscar aluno no Flexge: {str(e)}")
+            return None
+
     async def buscar_aluno_por_numero(self, phone: str):
         """
         Busca um aluno pelo número do WhatsApp usando o Notion
@@ -73,11 +113,19 @@ class FlexgeService:
         except Exception:
             return f"Explicação sobre {topico} não disponível no momento. Por favor tente mais tarde."
 
-    async def buscar_detalhes_prova(self, aluno_id: str):
+    async def buscar_detalhes_prova(self, aluno_email: str):
         """
         Busca detalhes das provas recentes do aluno
         """
         try:
+            # Primeiro buscar o aluno no Flexge pelo email
+            aluno_flexge = await self.buscar_aluno_flexge_por_email(aluno_email)
+            if not aluno_flexge:
+                print(f"Aluno não encontrado no Flexge com email: {aluno_email}")
+                return None
+                
+            aluno_id = aluno_flexge["id"]
+            
             # Buscar mastery tests
             url_tests = f"{self.base_url}/students/{aluno_id}/mastery-tests"
             resp_tests = requests.get(url_tests, headers=self.generate_headers(), timeout=10)

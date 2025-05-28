@@ -73,13 +73,6 @@ class NotionService:
                 "endereco": properties.get("Endereço Completo", {}).get("rich_text", [{}])[0].get("text", {}).get("content", "") if properties.get("Endereço Completo", {}).get("rich_text") else ""
             }
             
-            # Adicionar campo flexge_id se existir (pode estar em campo personalizado)
-            # Verificar se existe campo ID ou Flexge ID
-            if properties.get("ID", {}).get("unique_id"):
-                aluno_data["flexge_id"] = properties.get("ID", {}).get("unique_id", {}).get("number")
-            elif properties.get("Flexge ID", {}).get("rich_text"):
-                aluno_data["flexge_id"] = properties.get("Flexge ID", {}).get("rich_text", [{}])[0].get("text", {}).get("content", "") if properties.get("Flexge ID", {}).get("rich_text") else ""
-            
             return aluno_data
             
         except Exception as e:
@@ -126,13 +119,6 @@ class NotionService:
                 "plano": properties.get("Plano", {}).get("select", {}).get("name", "") if properties.get("Plano", {}).get("select") else "",
                 "endereco": properties.get("Endereço Completo", {}).get("rich_text", [{}])[0].get("text", {}).get("content", "") if properties.get("Endereço Completo", {}).get("rich_text") else ""
             }
-            
-            # Adicionar campo flexge_id se existir (pode estar em campo personalizado)
-            # Verificar se existe campo ID ou Flexge ID
-            if properties.get("ID", {}).get("unique_id"):
-                aluno_data["flexge_id"] = properties.get("ID", {}).get("unique_id", {}).get("number")
-            elif properties.get("Flexge ID", {}).get("rich_text"):
-                aluno_data["flexge_id"] = properties.get("Flexge ID", {}).get("rich_text", [{}])[0].get("text", {}).get("content", "") if properties.get("Flexge ID", {}).get("rich_text") else ""
             
             return aluno_data
             
