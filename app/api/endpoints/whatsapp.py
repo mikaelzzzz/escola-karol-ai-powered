@@ -61,6 +61,7 @@ async def zapi_webhook(request: Request):
     """
     try:
         webhook_data = await request.json()
+        logger.info(f"Webhook recebido: {webhook_data}")
         
         # Verificar se é um tipo de mensagem suportado
         if webhook_data.get("type") not in ["message", "audio", "image", "document"]:
