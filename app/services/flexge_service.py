@@ -1,18 +1,15 @@
 import requests
 from app.core.config import settings
-from app.models.whatsapp_mapping import WhatsAppMapping
-from sqlalchemy.orm import Session
 import time
 from openai import OpenAI
 import json
 from app.services.notion_service import NotionService
 
 class FlexgeService:
-    def __init__(self, db: Session = None):
+    def __init__(self):
         self.base_url = settings.FLEXGE_API_BASE
         self.api_key = settings.FLEXGE_API_KEY
         self.openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
-        self.db = db
         self.notion_service = NotionService()
     
     def generate_headers(self):
@@ -30,109 +27,16 @@ class FlexgeService:
     
     async def buscar_aluno_por_email(self, email: str):
         """
-        Busca um aluno pelo email, primeiro no Notion e depois no Flexge
+        Busca um aluno pelo email usando o Notion
         """
-        # Primeiro buscar no Notion para ter os dados completos
-        aluno_notion = await self.notion_service.buscar_aluno_por_email(email)
-        if not aluno_notion:
-            # Se não encontrar no Notion, buscar no Flexge
-            page = 1
-            while True:
-                data = await self.get_students(page)
-                if not data or not data.get("docs"):
-                    return None
-                for aluno in data["docs"]:
-                    if aluno["email"].lower() == email.lower():
-                        return aluno
-                if page >= data["pages"]:
-                    break
-                page += 1
-            return None
-            
-        # Se encontrou no Notion, buscar dados complementares no Flexge
-        page = 1
-        while True:
-            data = await self.get_students(page)
-            if not data or not data.get("docs"):
-                break
-            for aluno in data["docs"]:
-                if aluno["email"].lower() == email.lower():
-                    # Mesclar dados do Notion com dados do Flexge
-                    return {
-                        **aluno,
-                        "whatsapp": aluno_notion["whatsapp"],
-                        "notion_id": aluno_notion["notion_id"],
-                        "status_notion": aluno_notion["status"]
-                    }
-            if page >= data["pages"]:
-                break
-            page += 1
-                
-        # Se não encontrou no Flexge, retornar apenas dados do Notion
-        return aluno_notion
+        return await self.notion_service.buscar_aluno_por_email(email)
 
     async def buscar_aluno_por_numero(self, phone: str):
         """
-        Busca um aluno pelo número de WhatsApp usando o Notion
+        Busca um aluno pelo número do WhatsApp usando o Notion
         """
-        # Buscar diretamente no Notion
-        aluno_notion = await self.notion_service.buscar_aluno_por_whatsapp(phone)
-        if not aluno_notion:
-            return None
-            
-        # Se encontrou no Notion, buscar dados complementares no Flexge
-        if aluno_notion["email"]:
-            page = 1
-            while True:
-                data = await self.get_students(page)
-                if not data or not data.get("docs"):
-                    break
-                for aluno in data["docs"]:
-                    if aluno["email"].lower() == aluno_notion["email"].lower():
-                        # Mesclar dados do Notion com dados do Flexge
-                        return {
-                            **aluno,
-                            "whatsapp": aluno_notion["whatsapp"],
-                            "notion_id": aluno_notion["notion_id"],
-                            "status_notion": aluno_notion["status"]
-                        }
-                if page >= data["pages"]:
-                    break
-                page += 1
-                    
-        # Se não encontrou no Flexge, retornar apenas dados do Notion
-        return aluno_notion
+        return await self.notion_service.buscar_aluno_por_whatsapp(phone)
         
-    async def associar_whatsapp(self, phone: str, email: str):
-        """
-        Associa um número de WhatsApp a um email de aluno
-        """
-        if not self.db:
-            return False
-            
-        try:
-            # Verificar se o aluno existe no Flexge
-            aluno = await self.buscar_aluno_por_email(email)
-            if not aluno:
-                return False
-                
-            # Formatar o número
-            phone = ''.join(filter(str.isdigit, phone))
-            if not phone.startswith('55'):
-                phone = '55' + phone
-                
-            # Criar ou atualizar o mapeamento
-            mapping = WhatsAppMapping(phone=phone, email=email)
-            self.db.merge(mapping)
-            self.db.commit()
-            
-            return True
-            
-        except Exception as e:
-            self.db.rollback()
-            print(f"Erro ao associar WhatsApp: {str(e)}")
-            return False
-
     async def patch_student_action(self, student_id: str, action: str):
         url = f"{self.base_url}/students/{action}"
         payload = {"students": [student_id]}

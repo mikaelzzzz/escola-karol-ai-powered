@@ -1,9 +1,7 @@
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, HTTPException, Request
 from app.services.whatsapp_service import WhatsAppService
 from app.services.flexge_service import FlexgeService
 from app.services.elevenlabs_service import text_to_speech
-from app.db.session import get_db
-from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel
 import json
@@ -22,27 +20,27 @@ class WhatsAppAssociationRequest(BaseModel):
     verification_code: str  # Código enviado por email para verificação
 
 @router.post("/associate")
-async def associate_whatsapp(
-    request: WhatsAppAssociationRequest,
-    db: Session = Depends(get_db)
-):
+async def associate_whatsapp(request: WhatsAppAssociationRequest):
     """
-    Associa um número de WhatsApp ao email de um aluno
+    Associa um número de WhatsApp ao email de um aluno no Notion
     Requer código de verificação enviado por email
     """
-    flexge_service = FlexgeService(db)
+    flexge_service = FlexgeService()
     whatsapp_service = WhatsAppService()
     
     try:
         # TODO: Implementar verificação do código enviado por email
         
-        # Associar o número ao email
-        success = await flexge_service.associar_whatsapp(request.phone, request.email)
-        if not success:
+        # Verificar se o aluno existe no Notion
+        aluno = await flexge_service.buscar_aluno_por_email(request.email)
+        if not aluno:
             raise HTTPException(
                 status_code=400,
-                detail="Não foi possível associar o número. Verifique se o email está cadastrado no Flexge."
+                detail="Email não encontrado no sistema."
             )
+        
+        # TODO: Atualizar o número de WhatsApp no Notion
+        # Esta funcionalidade deve ser implementada no NotionService
         
         # Enviar mensagem de confirmação
         await whatsapp_service.enviar_mensagem_texto(
@@ -77,10 +75,8 @@ async def zapi_webhook(request: Request):
         phone = result["phone"]
         message = result["message"]
         message_type = result["type"]
+        aluno = result["aluno"]
         
-        # Identificar aluno pelo número do WhatsApp
-        flexge_service = FlexgeService()
-        aluno = await flexge_service.buscar_aluno_por_numero(phone)
         if not aluno:
             # Registrar tentativa de contato para follow-up
             logger.info(f"Tentativa de contato de número não cadastrado - {datetime.now().isoformat()}")
@@ -89,7 +85,7 @@ async def zapi_webhook(request: Request):
             return {"status": "número não cadastrado"}
         
         # Processar a mensagem com a Zaia
-        zaia_response, usar_audio = await whatsapp_service.process_with_zaia(message, aluno)
+        zaia_response, usar_audio = await whatsapp_service.process_with_zaia(message, aluno, result.get("contexto"))
         
         # Enviar resposta de acordo com o tipo de mensagem original
         await whatsapp_service.enviar_resposta(phone, zaia_response, message_type)
