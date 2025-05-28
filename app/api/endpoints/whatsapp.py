@@ -63,7 +63,12 @@ async def zapi_webhook(request: Request):
     try:
         webhook_data = await request.json()
         logger.info(f"Webhook recebido: {webhook_data}")
-        
+
+        # Ignorar mensagens de grupo
+        if webhook_data.get("isGroup") or "group" in str(webhook_data.get("phone", "")):
+            logger.info("Mensagem de grupo ignorada.")
+            return {"status": "ignored", "message": "Mensagem de grupo não processada."}
+
         # Normalizar ReceivedCallback para 'message'
         if webhook_data.get("type") == "ReceivedCallback":
             webhook_data["type"] = "message"
