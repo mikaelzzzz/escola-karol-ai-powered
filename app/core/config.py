@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     NOTION_DATABASE_ID: str = os.getenv("NOTION_DATABASE_ID")
     ALLOWED_EXTENSIONS: set = {'png', 'jpg', 'jpeg', 'gif'}
     MAX_FILE_SIZE: int = 5 * 1024 * 1024
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./app.db")
 
     class Config:
         env_file = ".env"
