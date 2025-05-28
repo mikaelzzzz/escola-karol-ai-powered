@@ -147,16 +147,32 @@ class WhatsAppService:
             else:
                 # Processar com Zaia
                 try:
-                    # Usar a API da Zaia para gerar resposta
-                    url = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-message/create"
-                    
                     # Criar um ID único para o chat baseado no número do WhatsApp
                     chat_external_id = f"whatsapp_{aluno.get('telefone', 'unknown')}" if aluno else f"whatsapp_{phone or 'unknown'}"
                     
-                    payload = {
+                    # Primeiro, criar ou recuperar o chat externo
+                    chat_url = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-chat/create"
+                    chat_payload = {
                         "agentId": settings.ZAIA_AGENT_ID,
-                        "externalGenerativeChatId": hash(chat_external_id) % 1000000,  # Gerar um ID numérico baseado no telefone
-                        "externalGenerativeChatExternalId": chat_external_id,
+                        "externalId": chat_external_id,
+                        "name": f"WhatsApp Chat - {aluno.get('nome', 'Unknown') if aluno else 'Unknown'}"
+                    }
+                    
+                    headers = {
+                        "Authorization": f"Bearer {settings.ZAIA_API_KEY}",
+                        "Content-Type": "application/json"
+                    }
+                    
+                    # Criar ou recuperar o chat
+                    chat_response = requests.post(chat_url, json=chat_payload, headers=headers, timeout=30)
+                    chat_response.raise_for_status()
+                    chat_data = chat_response.json()
+                    
+                    # Usar o ID do chat retornado para enviar a mensagem
+                    message_url = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-message/create"
+                    message_payload = {
+                        "agentId": settings.ZAIA_AGENT_ID,
+                        "externalGenerativeChatId": chat_data.get("id"),
                         "prompt": message,
                         "streaming": False,
                         "asMarkdown": False,
@@ -167,19 +183,15 @@ class WhatsAppService:
                         }
                     }
                     
-                    headers = {
-                        "Authorization": f"Bearer {settings.ZAIA_API_KEY}",
-                        "Content-Type": "application/json"
-                    }
+                    # Enviar a mensagem
+                    message_response = requests.post(message_url, json=message_payload, headers=headers, timeout=30)
+                    message_response.raise_for_status()
+                    message_data = message_response.json()
                     
-                    response = requests.post(url, json=payload, headers=headers, timeout=30)
-                    
-                    if response.status_code == 200:
-                        response_data = response.json()
-                        # A resposta pode estar em diferentes campos dependendo da configuração
-                        resposta_texto = response_data.get("message", "") or response_data.get("content", "") or response_data.get("response", "")
-                        if resposta_texto:
-                            return resposta_texto, True
+                    # Extrair a resposta do campo correto
+                    resposta_texto = message_data.get("text", "")
+                    if resposta_texto:
+                        return resposta_texto, True
                     
                     # Se não conseguiu com a Zaia, usar GPT-4 como fallback
                     nome = aluno.get("nome", "").split()[0] if aluno else ""

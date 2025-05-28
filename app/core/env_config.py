@@ -21,9 +21,9 @@ SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_app_specific_password
 
 # Zaia Configuration
-ZAIA_API_KEY=your_zaia_api_key
-ZAIA_BASE=https://api.zaia.ai
-ZAIA_AGENT_ID=1
+ZAIA_API_KEY=b8555e49-67d3-4f02-926c-37ce2effe5b3
+ZAIA_API_URL=https://api.zaia.app
+ZAIA_AGENT_ID=34790
 
 # Asaas Configuration
 ASAAS_API_KEY=your_asaas_api_key
