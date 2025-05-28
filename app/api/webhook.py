@@ -21,7 +21,14 @@ async def webhook_zapi(request: Request):
         
         numero = payload.get("phone")
         tipo = payload.get("type")
-        texto = payload.get("text", "")
+        
+        # Tratar callbacks de mensagem recebida
+        if tipo == "ReceivedCallback":
+            # Z-API envia a mensagem em payload["text"]["message"]
+            texto = payload.get("text", {}).get("message", "")
+            tipo = "message"  # normalizar para tratamento padrão
+        else:
+            texto = payload.get("text", "")
         
         if not numero or not tipo:
             logger.error("Payload inválido: faltando campos obrigatórios")
