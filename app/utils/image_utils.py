@@ -1,0 +1,1 @@
+# Implemente funções de manipulação/análise de imagem aqui 

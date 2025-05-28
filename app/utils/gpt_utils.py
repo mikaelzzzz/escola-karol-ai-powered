@@ -1,0 +1,1 @@
+# Implemente funções de integração com GPT/OpenAI aqui 
