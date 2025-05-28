@@ -151,11 +151,12 @@ class WhatsAppService:
                     chat_external_id = f"whatsapp_{aluno.get('telefone', 'unknown')}" if aluno else f"whatsapp_{phone or 'unknown'}"
                     
                     # Primeiro, criar ou recuperar o chat externo
-                    chat_url = f"{settings.ZAIA_API_URL}/v1.1/external-generative-chat/create"
+                    chat_url = f"{settings.ZAIA_API_URL}/v1/api/external-generative-chat/create"
                     chat_payload = {
                         "agentId": settings.ZAIA_AGENT_ID,
-                        "externalId": chat_external_id,
-                        "name": f"WhatsApp Chat - {aluno.get('nome', 'Unknown') if aluno else 'Unknown'}"
+                        "userPhone": phone,  # Usar o número do telefone do usuário
+                        "message": message,  # Texto da mensagem recebida
+                        "history": []  # Pode ser preenchido com contexto se necessário
                     }
                     
                     headers = {
@@ -168,50 +169,8 @@ class WhatsAppService:
                     chat_response.raise_for_status()
                     chat_data = chat_response.json()
                     
-                    # Usar o ID do chat retornado para enviar a mensagem
-                    message_url = f"{settings.ZAIA_API_URL}/v1.1/external-generative-message/create"
-                    message_payload = {
-                        "agentId": settings.ZAIA_AGENT_ID,
-                        "externalGenerativeChatId": chat_data.get("id"),
-                        "prompt": message,
-                        "streaming": False,
-                        "asMarkdown": False,
-                        "custom": {
-                            "whatsapp": aluno.get("telefone", "") if aluno else "",
-                            "nome": aluno.get("nome", "") if aluno else "",
-                            "email": aluno.get("email", "") if aluno else ""
-                        }
-                    }
-                    
-                    # Enviar a mensagem
-                    message_response = requests.post(message_url, json=message_payload, headers=headers, timeout=30)
-                    message_response.raise_for_status()
-                    message_data = message_response.json()
-                    
-                    # Extrair a resposta do campo correto
-                    resposta_texto = message_data.get("text", "")
-                    if resposta_texto:
-                        return resposta_texto, True
-                    
-                    # Se não conseguiu com a Zaia, usar GPT-4 como fallback
-                    nome = aluno.get("nome", "").split()[0] if aluno else ""
-                    prompt = f"""Você é a Karol, assistente virtual da Escola Karol Language Learning.
-                    Aluno: {nome}
-                    Mensagem do aluno: {message}
-                    
-                    Responda de forma amigável e profissional, sempre tentando ajudar.
-                    Se não souber responder, sugira opções como: verificar provas, boletos, dúvidas sobre o Flexge, etc."""
-                    
-                    response = self.openai_client.chat.completions.create(
-                        model="gpt-4",
-                        messages=[
-                            {"role": "system", "content": "Você é a Karol, assistente virtual educacional. Seja amigável, profissional e sempre tente ajudar."},
-                            {"role": "user", "content": prompt}
-                        ],
-                        max_tokens=300
-                    )
-                    
-                    return response.choices[0].message.content, False
+                    # Não precisamos mais criar uma mensagem separada, pois já enviamos junto com o chat
+                    return chat_data.get("text", ""), True
                     
                 except Exception as e:
                     print(f"Erro ao processar mensagem: {str(e)}")
