@@ -144,12 +144,8 @@ class WhatsAppService:
                 return await self.processar_duvida_prova(message, aluno), False
             elif "boleto" in message_lower or "pagamento" in message_lower:
                 return await self.processar_duvida_boleto(message, aluno), False
-            elif any(greeting in message_lower for greeting in ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite"]):
-                # Resposta de saudação personalizada
-                nome = aluno.get("nome", "").split()[0] if aluno else ""
-                return f"Olá {nome}! 😊 Sou a Karol, sua assistente virtual. Como posso ajudar você hoje? Posso auxiliar com:\n\n📚 Dúvidas sobre o Flexge\n📝 Informações sobre suas provas\n💳 Questões sobre pagamentos\n📖 Explicações gramaticais\n\nÉ só me dizer o que precisa!", False
             else:
-                # Tentar processar com Zaia
+                # Processar com Zaia
                 try:
                     # Usar a API da Zaia para gerar resposta
                     url = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-message/create"
