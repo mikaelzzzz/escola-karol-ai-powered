@@ -163,19 +163,30 @@ class WhatsAppService:
         try:
             # Baixar o áudio
             response = requests.get(audio_url)
-            audio_content = response.content
+            response.raise_for_status()
             
-            # Transcrever com Whisper
-            response = self.openai_client.audio.transcriptions.create(
-                model="whisper-1",
-                file=("audio.mp3", audio_content)
-            )
+            # Salvar temporariamente
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as temp_file:
+                temp_file.write(response.content)
+                temp_file_path = temp_file.name
             
-            return response.text
+            # Transcrever usando OpenAI
+            with open(temp_file_path, "rb") as audio_file:
+                transcript = self.openai_client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file
+                )
+            
+            # Limpar arquivo temporário
+            import os
+            os.unlink(temp_file_path)
+            
+            return transcript.text
             
         except Exception as e:
             print(f"Erro ao transcrever áudio: {str(e)}")
-            return ""
+            return "Desculpe, não consegui transcrever o áudio. Por favor, envie sua mensagem como texto."
             
     async def processar_duvida_prova(self, message: str, aluno: Dict) -> str:
         """

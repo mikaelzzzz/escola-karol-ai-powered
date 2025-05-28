@@ -72,31 +72,38 @@ async def zapi_webhook(request: Request):
         if webhook_data.get("type") not in ["message", "audio", "image", "document"]:
             return {"status": "ignored"}
         
-        # Processar a mensagem
-        whatsapp_service = WhatsAppService()
-        result = await whatsapp_service.processar_webhook(webhook_data)
-        if "error" in result:
-            raise HTTPException(status_code=400, detail=result["error"])
-            
-        phone = result["phone"]
-        message = result["message"]
-        message_type = result["type"]
-        aluno = result["aluno"]
+        # Processar mensagem
+        service = WhatsAppService()
+        resultado = await service.processar_webhook(webhook_data)
         
-        if not aluno:
-            # Registrar tentativa de contato para follow-up
-            logger.info(f"Tentativa de contato de número não cadastrado - {datetime.now().isoformat()}")
-            logger.info(f"Número: {phone}")
-            logger.info(f"Mensagem: {message}")
-            return {"status": "número não cadastrado"}
+        if resultado.get("error"):
+            if resultado["error"] == "Aluno não encontrado":
+                # Enviar mensagem educada informando que não foi encontrado
+                await service.enviar_mensagem_texto(
+                    webhook_data.get("phone"),
+                    "Olá! Não consegui encontrar seu cadastro. Por favor, verifique se seu número está registrado corretamente no sistema."
+                )
+            raise HTTPException(status_code=400, detail=resultado["error"])
         
         # Processar a mensagem com a Zaia
-        zaia_response, usar_audio = await whatsapp_service.process_with_zaia(message, aluno, result.get("contexto"))
+        resposta, usar_audio = await service.process_with_zaia(
+            resultado.get("message", ""),
+            resultado.get("aluno"),
+            resultado.get("contexto")
+        )
         
-        # Enviar resposta de acordo com o tipo de mensagem original
-        await whatsapp_service.enviar_resposta(phone, zaia_response, message_type)
+        # Enviar resposta
+        if usar_audio and settings.ELEVENLABS_API_KEY:
+            # Converter texto em áudio
+            audio_data = await text_to_speech(resposta)
+            if audio_data:
+                await service.enviar_audio(webhook_data.get("phone"), audio_data)
+            else:
+                await service.enviar_mensagem_texto(webhook_data.get("phone"), resposta)
+        else:
+            await service.enviar_mensagem_texto(webhook_data.get("phone"), resposta)
         
-        return {"status": "success"}
+        return {"status": "success", "message": "Mensagem processada com sucesso"}
         
     except Exception as e:
         logger.error(f"Erro no webhook: {str(e)}")
