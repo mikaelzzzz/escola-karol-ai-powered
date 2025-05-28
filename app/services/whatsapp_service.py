@@ -151,7 +151,7 @@ class WhatsAppService:
                     chat_external_id = f"whatsapp_{aluno.get('telefone', 'unknown')}" if aluno else f"whatsapp_{phone or 'unknown'}"
                     
                     # Primeiro, criar ou recuperar o chat externo
-                    chat_url = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-chat/create"
+                    chat_url = f"{settings.ZAIA_API_URL}/api/external-generative-chat/create"
                     chat_payload = {
                         "agentId": settings.ZAIA_AGENT_ID,
                         "externalId": chat_external_id,
@@ -169,7 +169,7 @@ class WhatsAppService:
                     chat_data = chat_response.json()
                     
                     # Usar o ID do chat retornado para enviar a mensagem
-                    message_url = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-message/create"
+                    message_url = f"{settings.ZAIA_API_URL}/api/external-generative-message/create"
                     message_payload = {
                         "agentId": settings.ZAIA_AGENT_ID,
                         "externalGenerativeChatId": chat_data.get("id"),
