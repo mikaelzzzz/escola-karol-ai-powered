@@ -53,11 +53,12 @@ class NotionService:
             # Mapear os dados do aluno com os campos corretos
             return {
                 "id": student["id"],
-                "nome": properties.get("Nome", {}).get("title", [{}])[0].get("text", {}).get("content", ""),
+                "nome": properties.get("Student Name", {}).get("title", [{}])[0].get("text", {}).get("content", ""),
                 "email": properties.get("Email", {}).get("email", ""),
                 "telefone": properties.get("Telefone", {}).get("rich_text", [{}])[0].get("text", {}).get("content", ""),
                 "cpf": properties.get("CPF", {}).get("rich_text", [{}])[0].get("text", {}).get("content", ""),
-                "status": properties.get("Status", {}).get("select", {}).get("name", "")
+                "plano": properties.get("Plano", {}).get("select", {}).get("name", ""),
+                "endereco": properties.get("Endereço Completo", {}).get("rich_text", [{}])[0].get("text", {}).get("content", "")
             }
             
         except Exception as e:
@@ -97,11 +98,12 @@ class NotionService:
             # Mapear os dados do aluno com os campos corretos
             return {
                 "id": student["id"],
-                "nome": properties.get("Nome", {}).get("title", [{}])[0].get("text", {}).get("content", ""),
+                "nome": properties.get("Student Name", {}).get("title", [{}])[0].get("text", {}).get("content", ""),
                 "email": properties.get("Email", {}).get("email", ""),
                 "telefone": properties.get("Telefone", {}).get("rich_text", [{}])[0].get("text", {}).get("content", ""),
                 "cpf": properties.get("CPF", {}).get("rich_text", [{}])[0].get("text", {}).get("content", ""),
-                "status": properties.get("Status", {}).get("select", {}).get("name", "")
+                "plano": properties.get("Plano", {}).get("select", {}).get("name", ""),
+                "endereco": properties.get("Endereço Completo", {}).get("rich_text", [{}])[0].get("text", {}).get("content", "")
             }
             
         except Exception as e:
