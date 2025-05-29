@@ -33,7 +33,7 @@ async def enviar_mensagem_zapi(numero, mensagem):
             logger.error(f"Exceção ao enviar mensagem: {str(e)}")
             return {"error": str(e)}
 
-async def enviar_audio_zapi(numero, audio_bytes):
+async def enviar_audio_zapi(numero: str, audio_bytes: bytes):
     """
     Envia um áudio via Z-API.
     O áudio deve estar em formato OGG.
@@ -51,16 +51,17 @@ async def enviar_audio_zapi(numero, audio_bytes):
         
         headers = {
             "Content-Type": "application/json",
-            "Client-Token": settings.ZAPI_SECURITY_TOKEN,
+            "Client-Token": settings.ZAPI_SECURITY_TOKEN
         }
         
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=payload) as response:
-                if response.status == 200:
+                response_data = await response.json()
+                if response.status == 200 and response_data.get("sent", False):
                     logger.info(f"Áudio enviado para {numero}")
                     return {"success": True}
                 else:
-                    error_text = await response.text()
+                    error_text = f"Status: {response.status}, Response: {response_data}"
                     logger.error(f"Erro ao enviar áudio: {error_text}")
                     return {"error": error_text}
                     

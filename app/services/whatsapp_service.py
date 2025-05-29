@@ -174,8 +174,8 @@ class WhatsAppService:
                     chat_response.raise_for_status()
                     chat_data = chat_response.json()
                     
-                    # Não precisamos mais criar uma mensagem separada, pois já enviamos junto com o chat
-                    return chat_data.get("text", ""), True
+                    # Retornar False para usar_audio em mensagens de texto normais
+                    return chat_data.get("text", ""), False
                     
                 except Exception as e:
                     logger.error(f"Erro ao processar mensagem: {str(e)}")
@@ -282,16 +282,13 @@ class WhatsAppService:
             logger.error(f"Erro ao enviar mensagem: {str(e)}")
             raise
             
-    async def enviar_audio(self, phone: str, message: str):
+    async def enviar_audio(self, phone: str, audio_data: bytes):
         """
-        Converte texto para áudio e envia via Z-API
+        Envia áudio via Z-API
         """
         try:
-            # Converter texto para áudio OGG
-            audio_ogg = await text_to_speech(message)
-            
             # Enviar áudio
-            result = await enviar_audio_zapi(phone, audio_ogg)
+            result = await enviar_audio_zapi(phone, audio_data)
             if result.get("error"):
                 logger.error(f"Erro ao enviar áudio: {result['error']}")
                 raise Exception(result["error"])
@@ -350,7 +347,8 @@ class WhatsAppService:
         try:
             # Se a mensagem original foi um áudio, responder com áudio
             if tipo_mensagem_original == "audio":
-                await self.enviar_audio(phone, resposta)
+                audio_data = await text_to_speech(resposta)
+                await self.enviar_audio(phone, audio_data)
             else:
                 await self.enviar_mensagem_texto(phone, resposta)
         except Exception as e:
