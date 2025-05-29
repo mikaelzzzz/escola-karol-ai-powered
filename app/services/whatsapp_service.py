@@ -50,6 +50,11 @@ class WhatsAppService:
                 audio_url = webhook_data["audio"]["audioUrl"]
                 message = await self.transcrever_audio(audio_url)
                 message_type = "audio"
+            # Sempre processar imagem se o campo existir
+            elif "image" in webhook_data and webhook_data["image"].get("imageUrl"):
+                url = webhook_data["image"]["imageUrl"]
+                message, contexto = await self.extrair_texto_midia(url, "image")
+                message_type = "image"
             elif message_type == "message":
                 message = webhook_data.get("text", "")
             elif message_type in ["image", "document"]:
