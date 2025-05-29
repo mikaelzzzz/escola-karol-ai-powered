@@ -10,6 +10,8 @@ from app.services.asaas_service import AsaasService
 import base64
 import openai
 import logging
+import aiohttp
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -144,56 +146,52 @@ class WhatsAppService:
             
             # Identificar intenção da mensagem
             message_lower = message.lower()
+            
+            # Normalizar mensagem
             logger.info(f"Mensagem normalizada: {message_lower}")
             
-            # Verificar intenções específicas
-            if "prova" in message_lower or "teste" in message_lower or "mastery" in message_lower:
-                return await self.processar_duvida_prova(message, aluno), False
-            elif "boleto" in message_lower or "pagamento" in message_lower:
-                return await self.processar_duvida_boleto(message, aluno), False
-            else:
-                # Processar com Zaia
-                try:
-                    logger.info("Processando com API da Zaia")
-                    # Criar um ID único para o chat baseado no número do WhatsApp
-                    chat_external_id = f"whatsapp_{aluno.get('telefone', 'unknown')}" if aluno else f"whatsapp_{phone or 'unknown'}"
+            # Processar com API da Zaia
+            logger.info("Processando com API da Zaia")
+            
+            url = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-chat/create"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {settings.ZAIA_API_KEY}"
+            }
+            payload = {
+                "agentId": settings.ZAIA_AGENT_ID,
+                "userPhone": phone,
+                "message": message,
+                "history": []
+            }
+            
+            logger.info(f"Enviando requisição para Zaia. URL: {url}")
+            logger.info(f"Payload: {payload}")
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, headers=headers, json=payload) as response:
+                    response_data = await response.json()
+                    logger.info(f"Resposta inicial da Zaia: {response_data}")
                     
-                    # Primeiro, criar ou recuperar o chat externo
-                    chat_url = f"{settings.ZAIA_API_URL}/external-generative-chat/create"
-                    chat_payload = {
-                        "agentId": settings.ZAIA_AGENT_ID,
-                        "userPhone": phone,  # Usar o número do telefone do usuário
-                        "message": message,  # Texto da mensagem recebida
-                        "history": []  # Pode ser preenchido com contexto se necessário
-                    }
+                    # Aguardar e buscar a resposta real
+                    if response_data.get("id"):
+                        chat_id = response_data["id"]
+                        # Tentar até 5 vezes com intervalo de 1 segundo
+                        for _ in range(5):
+                            get_url = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-chat/{chat_id}"
+                            async with session.get(get_url, headers=headers) as get_response:
+                                chat_data = await get_response.json()
+                                logger.info(f"Buscando resposta da Zaia. Chat ID: {chat_id}, Resposta: {chat_data}")
+                                if chat_data.get("response"):
+                                    return chat_data["response"], False
+                            await asyncio.sleep(1)
                     
-                    headers = {
-                        "Authorization": f"Bearer {settings.ZAIA_API_KEY}",
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    }
-                    
-                    logger.info(f"Enviando requisição para Zaia. URL: {chat_url}")
-                    logger.info(f"Payload: {chat_payload}")
-                    
-                    # Criar ou recuperar o chat
-                    chat_response = requests.post(chat_url, json=chat_payload, headers=headers, timeout=30)
-                    chat_response.raise_for_status()
-                    chat_data = chat_response.json()
-                    
-                    logger.info(f"Resposta da Zaia: {chat_data}")
-                    
-                    # Retornar False para usar_audio em mensagens de texto normais
-                    return chat_data.get("text", ""), False
-                    
-                except Exception as e:
-                    logger.error(f"Erro ao processar mensagem com Zaia: {str(e)}")
-                    # Se tudo falhar, usar resposta padrão
-                    return "Desculpe, estou com dificuldades técnicas no momento. Por favor, tente novamente em alguns instantes ou seja mais específico sobre o que precisa (ex: 'quero ver minha prova', 'preciso do boleto', etc.)", False
-                
+                    # Se não conseguir obter a resposta, retornar mensagem de erro
+                    return "Desculpe, estou com dificuldades para processar sua mensagem no momento. Por favor, tente novamente em alguns instantes.", False
+            
         except Exception as e:
-            logger.error(f"Erro ao processar com Zaia: {str(e)}")
-            return "Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.", False
+            logger.error(f"Erro ao processar mensagem com Zaia: {str(e)}")
+            return "Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente em alguns instantes.", False
             
     async def transcrever_audio(self, audio_url: str) -> str:
         """
