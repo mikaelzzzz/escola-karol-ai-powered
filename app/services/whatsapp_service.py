@@ -144,57 +144,58 @@ class WhatsAppService:
             elif contexto == "erro_flexge":
                 return await self.processar_erro_flexge(message, aluno), False
             
-            # Identificar intenção da mensagem
             message_lower = message.lower()
-            
-            # Normalizar mensagem
             logger.info(f"Mensagem normalizada: {message_lower}")
+            logger.info("Processando com API da Zaia (novo fluxo)")
             
-            # Processar com API da Zaia
-            logger.info("Processando com API da Zaia")
-            
-            url = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-chat/create"
+            url_chat = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-chat/create"
+            url_message = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-message/create"
+            url_retrieve = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-message/retrieve-multiple"
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {settings.ZAIA_API_KEY}"
             }
-            payload = {
-                "agentId": settings.ZAIA_AGENT_ID,
-                "userPhone": phone,
-                "message": message,
-                "history": []
+            # 1. Criar o chat
+            payload_chat = {
+                "agentId": settings.ZAIA_AGENT_ID
             }
-            
-            logger.info(f"Enviando requisição para Zaia. URL: {url}")
-            logger.info(f"Payload: {payload}")
-            
+            logger.info(f"Criando chat na Zaia: {url_chat} | Payload: {payload_chat}")
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, headers=headers, json=payload) as response:
-                    response_data = await response.json()
-                    logger.info(f"Resposta inicial da Zaia: {response_data}")
-                    
-                    # Aguardar e buscar a resposta real
-                    if response_data.get("id"):
-                        chat_id = response_data["id"]
-                        # Tentar até 5 vezes com intervalo de 1 segundo
-                        for _ in range(5):
-                            get_url = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-chat/{chat_id}"
-                            async with session.get(get_url, headers=headers) as get_response:
-                                try:
-                                    chat_data = await get_response.json()
-                                    logger.info(f"Buscando resposta da Zaia. Chat ID: {chat_id}, Resposta: {chat_data}")
-                                    if chat_data.get("response"):
-                                        return chat_data["response"], False
-                                except Exception as e:
-                                    # Se não for JSON, logar o texto bruto
-                                    raw_text = await get_response.text()
-                                    logger.error(f"Erro ao decodificar JSON da resposta da Zaia (status {get_response.status}): {raw_text}")
-                                    break
-                            await asyncio.sleep(1)
-                    
-                    # Se não conseguir obter a resposta, retornar mensagem de erro
-                    return "Desculpe, estou com dificuldades para processar sua mensagem no momento. Por favor, tente novamente em alguns instantes.", False
-            
+                async with session.post(url_chat, headers=headers, json=payload_chat) as resp_chat:
+                    chat_data = await resp_chat.json()
+                    logger.info(f"Resposta da criação do chat: {chat_data}")
+                    chat_id = chat_data.get("id")
+                    if not chat_id:
+                        return "Erro ao criar chat na Zaia.", False
+                # 2. Criar a mensagem
+                payload_message = {
+                    "agentId": settings.ZAIA_AGENT_ID,
+                    "externalGenerativeChatId": chat_id,
+                    "prompt": message,
+                    "custom": {"whatsapp": phone}
+                }
+                logger.info(f"Enviando mensagem para Zaia: {url_message} | Payload: {payload_message}")
+                async with session.post(url_message, headers=headers, json=payload_message) as resp_msg:
+                    msg_data = await resp_msg.json()
+                    logger.info(f"Resposta do envio da mensagem: {msg_data}")
+                # 3. Buscar a resposta
+                for _ in range(10):
+                    retrieve_url = f"{url_retrieve}?externalGenerativeChatIds={chat_id}"
+                    async with session.get(retrieve_url, headers=headers) as resp_retrieve:
+                        try:
+                            retrieve_data = await resp_retrieve.json()
+                            logger.info(f"Buscando resposta da Zaia. Chat ID: {chat_id}, Resposta: {retrieve_data}")
+                            # Procurar a última mensagem do tipo 'assistant'
+                            messages = retrieve_data.get("data", [])
+                            for msg in reversed(messages):
+                                if msg.get("role") == "assistant" and msg.get("response"):
+                                    return msg["response"], False
+                        except Exception as e:
+                            raw_text = await resp_retrieve.text()
+                            logger.error(f"Erro ao decodificar JSON da resposta da Zaia (status {resp_retrieve.status}): {raw_text}")
+                            break
+                    await asyncio.sleep(2)
+                return "Desculpe, estou com dificuldades para processar sua mensagem no momento. Por favor, tente novamente em alguns instantes.", False
         except Exception as e:
             logger.error(f"Erro ao processar mensagem com Zaia: {str(e)}")
             return "Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente em alguns instantes.", False
