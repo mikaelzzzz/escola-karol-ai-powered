@@ -13,6 +13,7 @@ async def text_to_speech(text: str) -> bytes:
     Converte texto para áudio usando ElevenLabs.
     Retorna os bytes do áudio em formato OGG.
     """
+    # Rachel (voice_id: 21m00Tcm4TlvDq8ikWAM), modelo multilingue v2
     url = "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM"
     
     headers = {
@@ -23,10 +24,13 @@ async def text_to_speech(text: str) -> bytes:
     
     payload = {
         "text": text,
-        "model_id": "eleven_monolingual_v1",
+        "model_id": "eleven_multilingual_v2",
         "voice_settings": {
             "stability": 0.5,
-            "similarity_boost": 0.75
+            "similarity_boost": 0.95,
+            "style": 0,
+            "use_speaker_boost": True,
+            "speed": 1.12
         }
     }
     
