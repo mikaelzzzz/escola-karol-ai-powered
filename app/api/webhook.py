@@ -3,7 +3,7 @@ from app.services.zaia_service import detectar_intencao
 from app.services.flexge_service import processar_mastery_test
 from app.services.gramatica_service import processar_duvida_gramatical
 from app.services.financeiro_service import processar_boleto
-from app.services.voice_service import processar_voz
+from app.services.voice_service import text_to_speech
 from app.utils.zapi_utils import enviar_mensagem_zapi, enviar_audio_zapi
 from app.services.whatsapp_service import WhatsAppService
 from app.schemas.webhook import WebhookResponse
@@ -63,7 +63,7 @@ async def webhook_zapi(request: Request):
         if tipo == "audio" and "audio" in payload:
             audio_url = payload["audio"].get("url")
             if audio_url:
-                texto = await processar_voz(audio_url)
+                texto = await text_to_speech(audio_url)
         
         # Se for imagem, pegar a URL
         elif tipo == "image" and "image" in payload:
@@ -92,8 +92,8 @@ async def webhook_zapi(request: Request):
             resposta = processar_duvida_gramatical(numero, texto)
             await enviar_mensagem_zapi(numero, resposta)
         elif intencao == "resposta_audio":
-            resposta = processar_voz(numero, texto)
-            await enviar_audio_zapi(numero, resposta)
+            audio_data = await text_to_speech(texto)
+            await enviar_audio_zapi(numero, audio_data)
         else:
             await enviar_mensagem_zapi(numero, "Desculpe, não entendi sua solicitação.")
 
