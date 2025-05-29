@@ -24,46 +24,47 @@ async def enviar_mensagem_zapi(numero, mensagem):
             async with session.post(url, headers=headers, json=payload) as response:
                 if response.status == 200:
                     logger.info(f"Mensagem enviada para {numero}")
-                    return True
+                    return {"success": True}
                 else:
-                    text = await response.text()
-                    logger.error(f"Erro ao enviar mensagem para {numero}: {text}")
-                    return False
+                    error_text = await response.text()
+                    logger.error(f"Erro ao enviar mensagem: {error_text}")
+                    return {"error": error_text}
         except Exception as e:
-            logger.error(f"Exceção ao enviar mensagem para {numero}: {str(e)}")
-            return False
+            logger.error(f"Exceção ao enviar mensagem: {str(e)}")
+            return {"error": str(e)}
 
 async def enviar_audio_zapi(numero, audio_bytes):
     """
-    Envia um áudio (mp3) via Z-API.
+    Envia um áudio via Z-API.
+    O áudio deve estar em formato OGG.
     """
-    url = f"https://api.z-api.io/instances/{settings.ZAPI_INSTANCE_ID}/token/{settings.ZAPI_TOKEN}/send-audio"
+    url = f"https://api.z-api.io/instances/{settings.ZAPI_INSTANCE_ID}/token/{settings.ZAPI_TOKEN}/send-audio/base64"
     
-    # Converte os bytes do áudio para base64
-    audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
-    
-    payload = {
-        "phone": numero,
-        "audio": f"data:audio/mpeg;base64,{audio_base64}",
-        "waveform": True
-    }
-    
-    headers = {
-        "Content-Type": "application/json",
-        "Client-Token": settings.ZAPI_SECURITY_TOKEN,
-    }
-    
-    async with aiohttp.ClientSession() as session:
-        try:
+    try:
+        # Codificar o áudio em base64
+        audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+        
+        payload = {
+            "phone": numero,
+            "base64": audio_base64
+        }
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Client-Token": settings.ZAPI_SECURITY_TOKEN,
+        }
+        
+        async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=payload) as response:
                 if response.status == 200:
                     logger.info(f"Áudio enviado para {numero}")
-                    return True
+                    return {"success": True}
                 else:
-                    text = await response.text()
-                    logger.error(f"Erro ao enviar áudio para {numero}: {text}")
-                    return False
-        except Exception as e:
-            logger.error(f"Exceção ao enviar áudio para {numero}: {str(e)}")
-            return False
+                    error_text = await response.text()
+                    logger.error(f"Erro ao enviar áudio: {error_text}")
+                    return {"error": error_text}
+                    
+    except Exception as e:
+        logger.error(f"Exceção ao enviar áudio: {str(e)}")
+        return {"error": str(e)}
 
