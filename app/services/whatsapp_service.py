@@ -12,8 +12,12 @@ import openai
 import logging
 import aiohttp
 import asyncio
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
+
+# Cache simples: phone -> chat_id
+chat_context_cache = defaultdict(lambda: None)
 
 class WhatsAppService:
     def __init__(self):
@@ -56,7 +60,14 @@ class WhatsAppService:
                 message, contexto = await self.extrair_texto_midia(url, message_type)
             else:
                 return {"error": "Tipo de mensagem não suportado"}
-                
+            
+            # Validação: mensagem não pode ser vazia
+            if not message or not message.strip():
+                return {
+                    "error": "Mensagem vazia",
+                    "message": "Não consegui entender sua mensagem. Pode tentar novamente ou enviar em texto?"
+                }
+            
             return {
                 "phone": phone,
                 "message": message,
@@ -155,26 +166,44 @@ class WhatsAppService:
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {settings.ZAIA_API_KEY}"
             }
-            # 1. Criar o chat
-            payload_chat = {
-                "agentId": settings.ZAIA_AGENT_ID
-            }
-            logger.info(f"Criando chat na Zaia: {url_chat} | Payload: {payload_chat}")
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url_chat, headers=headers, json=payload_chat) as resp_chat:
-                    chat_data = await resp_chat.json()
-                    logger.info(f"Resposta da criação do chat: {chat_data}")
-                    chat_id = chat_data.get("id")
-                    if not chat_id:
-                        return "Erro ao criar chat na Zaia.", False
-                # 2. Criar a mensagem
-                payload_message = {
-                    "agentId": settings.ZAIA_AGENT_ID,
-                    "externalGenerativeChatId": chat_id,
-                    "prompt": message,
-                    "custom": {"whatsapp": phone}
+            
+            # Se a mensagem for um e-mail e já houver chat_id, reutilize
+            if "@" in message and "." in message and chat_context_cache[phone]:
+                chat_id = chat_context_cache[phone]
+                logger.info(f"Reutilizando chat_id existente para {phone}: {chat_id}")
+            else:
+                # 1. Criar o chat
+                payload_chat = {
+                    "agentId": settings.ZAIA_AGENT_ID
                 }
-                logger.info(f"Enviando mensagem para Zaia: {url_message} | Payload: {payload_message}")
+                logger.info(f"Criando chat na Zaia: {url_chat} | Payload: {payload_chat}")
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url_chat, headers=headers, json=payload_chat) as resp_chat:
+                        chat_data = await resp_chat.json()
+                        logger.info(f"Resposta da criação do chat: {chat_data}")
+                        chat_id = chat_data.get("id")
+                        if not chat_id:
+                            return "Erro ao criar chat na Zaia.", False
+                        # Salva o chat_id no cache
+                        chat_context_cache[phone] = chat_id
+            # 2. Criar a mensagem
+            # Buscar histórico do chat antes de enviar nova mensagem
+            historico = await self.buscar_historico_zaia(chat_id)
+            contexto = ""
+            for msg in historico[-5:]:  # Pega as últimas 5 mensagens
+                if msg["origin"] == "user":
+                    contexto += f"Usuário: {msg['text']}\n"
+                elif msg["origin"] == "assistant":
+                    contexto += f"Assistente: {msg['text']}\n"
+            prompt_com_contexto = f"{contexto}Usuário: {message}"
+            payload_message = {
+                "agentId": settings.ZAIA_AGENT_ID,
+                "externalGenerativeChatId": chat_id,
+                "prompt": prompt_com_contexto,
+                "custom": {"whatsapp": phone}
+            }
+            logger.info(f"Enviando mensagem para Zaia: {url_message} | Payload: {payload_message}")
+            async with aiohttp.ClientSession() as session:
                 async with session.post(url_message, headers=headers, json=payload_message) as resp_msg:
                     msg_data = await resp_msg.json()
                     logger.info(f"Resposta do envio da mensagem: {msg_data}")
@@ -196,7 +225,7 @@ class WhatsAppService:
                             logger.error(f"Erro ao decodificar JSON da resposta da Zaia (status {resp_retrieve.status}): {raw_text}")
                             break
                     await asyncio.sleep(2)
-                return "Desculpe, estou com dificuldades para processar sua mensagem no momento. Por favor, tente novamente em alguns instantes.", False
+            return "Desculpe, estou com dificuldades para processar sua mensagem no momento. Por favor, tente novamente em alguns instantes.", False
         except Exception as e:
             logger.error(f"Erro ao processar mensagem com Zaia: {str(e)}")
             return "Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente em alguns instantes.", False
@@ -377,3 +406,27 @@ class WhatsAppService:
                     raise e2
             else:
                 raise e 
+
+    async def buscar_historico_zaia(self, chat_id: int) -> list:
+        """
+        Busca o histórico completo de mensagens de um chat na Zaia.
+        Retorna uma lista de dicionários com origin e text.
+        """
+        url_retrieve = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-message/retrieve-multiple?externalGenerativeChatIds={chat_id}"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {settings.ZAIA_API_KEY}"
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url_retrieve, headers=headers) as resp:
+                try:
+                    data = await resp.json()
+                    chats = data.get("externalGenerativeChats", [])
+                    if chats:
+                        messages = chats[0].get("externalGenerativeMessages", [])
+                        return [{"origin": m.get("origin"), "text": m.get("text")} for m in messages]
+                    return []
+                except Exception as e:
+                    raw_text = await resp.text()
+                    logger.error(f"Erro ao buscar histórico da Zaia (status {resp.status}): {raw_text}")
+                    return [] 
