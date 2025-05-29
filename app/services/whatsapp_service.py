@@ -185,11 +185,12 @@ class WhatsAppService:
                         try:
                             retrieve_data = await resp_retrieve.json()
                             logger.info(f"Buscando resposta da Zaia. Chat ID: {chat_id}, Resposta: {retrieve_data}")
-                            # Procurar a última mensagem do tipo 'assistant'
-                            messages = retrieve_data.get("data", [])
-                            for msg in reversed(messages):
-                                if msg.get("role") == "assistant" and msg.get("response"):
-                                    return msg["response"], False
+                            chats = retrieve_data.get("externalGenerativeChats", [])
+                            if chats:
+                                messages = chats[0].get("externalGenerativeMessages", [])
+                                for msg in reversed(messages):
+                                    if msg.get("origin") == "assistant" and msg.get("text"):
+                                        return msg["text"], False
                         except Exception as e:
                             raw_text = await resp_retrieve.text()
                             logger.error(f"Erro ao decodificar JSON da resposta da Zaia (status {resp_retrieve.status}): {raw_text}")
