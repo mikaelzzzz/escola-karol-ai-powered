@@ -107,18 +107,19 @@ async def zapi_webhook(request: Request):
         logger.info(f"Resposta da Zaia: {resposta}, usar_audio: {usar_audio}")
         
         # Enviar resposta
-        if usar_audio and settings.ELEVENLABS_API_KEY and webhook_data.get("type") == "audio":
-            try:
-                # Converter texto em áudio
-                audio_data = await text_to_speech(resposta)
-                if audio_data:
-                    # Enviar áudio diretamente sem tentar serializar para JSON
-                    await service.enviar_audio(webhook_data.get("phone"), audio_data)
-                else:
+        if usar_audio or resultado.get("type") == "audio":
+            if settings.ELEVENLABS_API_KEY:
+                try:
+                    # Converter texto em áudio
+                    audio_data = await text_to_speech(resposta)
+                    if audio_data:
+                        await service.enviar_audio(webhook_data.get("phone"), audio_data)
+                    else:
+                        await service.enviar_mensagem_texto(webhook_data.get("phone"), resposta)
+                except Exception as e:
+                    logger.error(f"Erro ao processar áudio: {str(e)}")
                     await service.enviar_mensagem_texto(webhook_data.get("phone"), resposta)
-            except Exception as e:
-                logger.error(f"Erro ao processar áudio: {str(e)}")
-                # Fallback para mensagem de texto em caso de erro
+            else:
                 await service.enviar_mensagem_texto(webhook_data.get("phone"), resposta)
         else:
             logger.info(f"Enviando resposta como texto para {webhook_data.get('phone')}")
