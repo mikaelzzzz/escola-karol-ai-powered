@@ -134,6 +134,8 @@ class WhatsAppService:
         Retorna uma tupla (resposta, usar_audio)
         """
         try:
+            logger.info(f"Iniciando processamento com Zaia. Mensagem: {message}, Contexto: {contexto}")
+            
             # Se tiver contexto específico, tratar adequadamente
             if contexto == "comprovante_pagamento":
                 return await self.processar_comprovante_pagamento(message, aluno), False
@@ -142,6 +144,7 @@ class WhatsAppService:
             
             # Identificar intenção da mensagem
             message_lower = message.lower()
+            logger.info(f"Mensagem normalizada: {message_lower}")
             
             # Verificar intenções específicas
             if "prova" in message_lower or "teste" in message_lower or "mastery" in message_lower:
@@ -151,6 +154,7 @@ class WhatsAppService:
             else:
                 # Processar com Zaia
                 try:
+                    logger.info("Processando com API da Zaia")
                     # Criar um ID único para o chat baseado no número do WhatsApp
                     chat_external_id = f"whatsapp_{aluno.get('telefone', 'unknown')}" if aluno else f"whatsapp_{phone or 'unknown'}"
                     
@@ -169,16 +173,21 @@ class WhatsAppService:
                         "Accept": "application/json"
                     }
                     
+                    logger.info(f"Enviando requisição para Zaia. URL: {chat_url}")
+                    logger.info(f"Payload: {chat_payload}")
+                    
                     # Criar ou recuperar o chat
                     chat_response = requests.post(chat_url, json=chat_payload, headers=headers, timeout=30)
                     chat_response.raise_for_status()
                     chat_data = chat_response.json()
                     
+                    logger.info(f"Resposta da Zaia: {chat_data}")
+                    
                     # Retornar False para usar_audio em mensagens de texto normais
                     return chat_data.get("text", ""), False
                     
                 except Exception as e:
-                    logger.error(f"Erro ao processar mensagem: {str(e)}")
+                    logger.error(f"Erro ao processar mensagem com Zaia: {str(e)}")
                     # Se tudo falhar, usar resposta padrão
                     return "Desculpe, estou com dificuldades técnicas no momento. Por favor, tente novamente em alguns instantes ou seja mais específico sobre o que precisa (ex: 'quero ver minha prova', 'preciso do boleto', etc.)", False
                 

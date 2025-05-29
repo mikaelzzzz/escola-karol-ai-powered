@@ -21,12 +21,16 @@ async def enviar_mensagem_zapi(numero, mensagem):
     
     async with aiohttp.ClientSession() as session:
         try:
+            logger.info(f"Enviando mensagem para {numero}. URL: {url}")
+            logger.info(f"Payload: {payload}")
             async with session.post(url, headers=headers, json=payload) as response:
+                response_text = await response.text()
+                logger.info(f"Resposta do Z-API: Status={response.status}, Body={response_text}")
                 if response.status == 200:
                     logger.info(f"Mensagem enviada para {numero}")
                     return {"success": True}
                 else:
-                    error_text = await response.text()
+                    error_text = f"Status: {response.status}, Response: {response_text}"
                     logger.error(f"Erro ao enviar mensagem: {error_text}")
                     return {"error": error_text}
         except Exception as e:

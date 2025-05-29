@@ -69,13 +69,17 @@ async def zapi_webhook(request: Request):
             logger.info("Mensagem de grupo ignorada.")
             return {"status": "ignored", "message": "Mensagem de grupo não processada."}
 
-        # Normalizar ReceivedCallback para 'message'
+        # Extrair texto da mensagem para ReceivedCallback
         if webhook_data.get("type") == "ReceivedCallback":
+            logger.info("Processando ReceivedCallback")
             webhook_data["type"] = "message"
-            webhook_data["text"] = webhook_data.get("text", {}).get("message", "")
+            if isinstance(webhook_data.get("text"), dict):
+                webhook_data["text"] = webhook_data["text"].get("message", "")
+            logger.info(f"Mensagem normalizada: {webhook_data}")
         
         # Verificar se é um tipo de mensagem suportado
         if webhook_data.get("type") not in ["message", "audio", "image", "document"]:
+            logger.info(f"Tipo de mensagem não suportado: {webhook_data.get('type')}")
             return {"status": "ignored"}
         
         # Processar mensagem
@@ -83,6 +87,7 @@ async def zapi_webhook(request: Request):
         resultado = await service.processar_webhook(webhook_data)
         
         if resultado.get("error"):
+            logger.error(f"Erro no processamento do webhook: {resultado['error']}")
             if resultado["error"] == "Aluno não encontrado":
                 # Enviar mensagem educada informando que não foi encontrado
                 await service.enviar_mensagem_texto(
@@ -92,12 +97,14 @@ async def zapi_webhook(request: Request):
             raise HTTPException(status_code=400, detail=resultado["error"])
         
         # Processar a mensagem com a Zaia
+        logger.info(f"Processando mensagem com Zaia: {resultado}")
         resposta, usar_audio = await service.process_with_zaia(
             resultado.get("message", ""),
             resultado.get("aluno"),
             resultado.get("contexto"),
             resultado.get("phone", webhook_data.get("phone"))
         )
+        logger.info(f"Resposta da Zaia: {resposta}, usar_audio: {usar_audio}")
         
         # Enviar resposta
         if usar_audio and settings.ELEVENLABS_API_KEY and webhook_data.get("type") == "audio":
@@ -114,6 +121,7 @@ async def zapi_webhook(request: Request):
                 # Fallback para mensagem de texto em caso de erro
                 await service.enviar_mensagem_texto(webhook_data.get("phone"), resposta)
         else:
+            logger.info(f"Enviando resposta como texto para {webhook_data.get('phone')}")
             await service.enviar_mensagem_texto(webhook_data.get("phone"), resposta)
         
         return {"status": "success", "message": "Mensagem processada com sucesso"}
