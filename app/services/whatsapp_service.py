@@ -180,10 +180,16 @@ class WhatsAppService:
                         for _ in range(5):
                             get_url = f"{settings.ZAIA_API_URL}/v1.1/api/external-generative-chat/{chat_id}"
                             async with session.get(get_url, headers=headers) as get_response:
-                                chat_data = await get_response.json()
-                                logger.info(f"Buscando resposta da Zaia. Chat ID: {chat_id}, Resposta: {chat_data}")
-                                if chat_data.get("response"):
-                                    return chat_data["response"], False
+                                try:
+                                    chat_data = await get_response.json()
+                                    logger.info(f"Buscando resposta da Zaia. Chat ID: {chat_id}, Resposta: {chat_data}")
+                                    if chat_data.get("response"):
+                                        return chat_data["response"], False
+                                except Exception as e:
+                                    # Se não for JSON, logar o texto bruto
+                                    raw_text = await get_response.text()
+                                    logger.error(f"Erro ao decodificar JSON da resposta da Zaia (status {get_response.status}): {raw_text}")
+                                    break
                             await asyncio.sleep(1)
                     
                     # Se não conseguir obter a resposta, retornar mensagem de erro
