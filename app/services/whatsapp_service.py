@@ -45,14 +45,13 @@ class WhatsAppService:
                     "message": "Desculpe, não consegui identificar seu cadastro. Por favor, entre em contato com a secretaria."
                 }
             
-            # Processar diferentes tipos de mensagem
-            if message_type == "message":
-                message = webhook_data.get("text", "")
-            elif message_type == "audio":
-                audio_url = webhook_data.get("audio", {}).get("url")
-                if not audio_url:
-                    return {"error": "URL do áudio não encontrada"}
+            # Sempre processar áudio se o campo existir
+            if "audio" in webhook_data and webhook_data["audio"].get("audioUrl"):
+                audio_url = webhook_data["audio"]["audioUrl"]
                 message = await self.transcrever_audio(audio_url)
+                message_type = "audio"
+            elif message_type == "message":
+                message = webhook_data.get("text", "")
             elif message_type in ["image", "document"]:
                 url = webhook_data.get(message_type, {}).get("url")
                 if not url:
