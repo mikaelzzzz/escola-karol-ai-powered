@@ -26,11 +26,11 @@ async def text_to_speech(text: str) -> bytes:
         "text": text,
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 1,
-            "similarity_boost": 1,
+            "stability": 0.5,
+            "similarity_boost": 0.95,
             "style": 0,
             "use_speaker_boost": True,
-            "speed": 1
+            "speed": 1.12
         }
     }
     
