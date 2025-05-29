@@ -1,9 +1,16 @@
-from fastapi import APIRouter
-from app.models.voice_models import VoiceRequest
-from app.services.voice_service import processar_voz
+from fastapi import APIRouter, HTTPException
+from app.services.voice_service import text_to_speech
+from app.schemas.voice import VoiceRequest, VoiceResponse
 
 router = APIRouter()
 
-@router.post("/clonar")
-async def clonar_voz(request: VoiceRequest):
-    return processar_voz(request.numero, request.texto) 
+@router.post("/generate", response_model=VoiceResponse)
+async def generate_voice(request: VoiceRequest):
+    """
+    Gera áudio a partir de texto usando ElevenLabs
+    """
+    try:
+        audio_data = await text_to_speech(request.text)
+        return VoiceResponse(audio=audio_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 
