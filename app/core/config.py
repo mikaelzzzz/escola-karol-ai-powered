@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     ZAIA_AGENT_ID: int = int(os.getenv("ZAIA_AGENT_ID", "34790"))
     ASAAS_API_KEY: str = os.getenv("ASAAS_API_KEY")
     ASAAS_BASE: str = os.getenv("ASAAS_BASE", "https://api.asaas.com/v3")
-    ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY")
+    ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "sk_cb5ba1fb644bd866d8449cd19bc6f052f999fd3777827b56")
     ELEVENLABS_VOICE_ID: str = os.getenv("ELEVENLABS_VOICE_ID", "ie5yJLYeLpsuijLaojmF")
     ZAPI_INSTANCE_ID: str = os.getenv("ZAPI_INSTANCE_ID")
     ZAPI_TOKEN: str = os.getenv("ZAPI_TOKEN")
