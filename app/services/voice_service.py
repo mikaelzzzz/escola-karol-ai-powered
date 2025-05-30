@@ -32,11 +32,12 @@ async def text_to_speech(text: str) -> bytes:
     Converte texto para áudio usando ElevenLabs.
     Retorna os bytes do áudio em formato OGG.
     """
-    # Formata o texto para lidar com múltiplos idiomas
-    formatted_text = format_multilingual_text(text)
+    # Envie o texto puro em português para evitar confusão de idioma
+    # Se precisar de pronúncia em inglês, trate isso separadamente
+    formatted_text = text
     
-    # Karol Pro Voice
-    url = "https://api.elevenlabs.io/v2git/text-to-speech/ie5yJLYeLpsuijLaojmF"
+    # Karol Pro Voice (certifique-se que é treinada para português)
+    url = "https://api.elevenlabs.io/v1/text-to-speech/ie5yJLYeLpsuijLaojmF"  # Troque o voice_id se necessário
     
     headers = {
         "Accept": "audio/mpeg",
@@ -46,13 +47,13 @@ async def text_to_speech(text: str) -> bytes:
     
     payload = {
         "text": formatted_text,
-        "model_id": "eleven_multilingual_v2",
+        "model_id": "eleven_portuguese_v2",
         "voice_settings": {
             "stability": 0.75,
             "similarity_boost": 0.85,
             "style": 0.35,
             "use_speaker_boost": True,
-            "speed": 1.12  # Voltando para velocidade mais rápida conforme solicitado
+            "speed": 1.12
         }
     }
     
