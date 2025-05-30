@@ -33,11 +33,10 @@ async def text_to_speech(text: str) -> bytes:
     Retorna os bytes do áudio em formato OGG.
     """
     # Envie o texto puro em português para evitar confusão de idioma
-    # Se precisar de pronúncia em inglês, trate isso separadamente
     formatted_text = text
     
-    # Karol Pro Voice (certifique-se que é treinada para português)
-    url = "https://api.elevenlabs.io/v1/text-to-speech/ie5yJLYeLpsuijLaojmF"  # Troque o voice_id se necessário
+    # Voice ID para voz em português brasileiro
+    url = "https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB"
     
     headers = {
         "Accept": "audio/mpeg",
@@ -47,14 +46,15 @@ async def text_to_speech(text: str) -> bytes:
     
     payload = {
         "text": formatted_text,
-        "model_id": "eleven_portuguese_v2",
+        "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 0.75,
-            "similarity_boost": 0.85,
+            "stability": 0.85,  # Aumentado para mais estabilidade
+            "similarity_boost": 0.75,  # Ajustado para manter características da voz
             "style": 0.35,
             "use_speaker_boost": True,
             "speed": 1.12
-        }
+        },
+        "language_code": "pt-BR"  # Forçar português brasileiro
     }
     
     try:
