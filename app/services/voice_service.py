@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------
 # Configurações fixas
 VOICE_ID = "ie5yJLYeLpsuijLaojmF"          # Voz profissional da Karol
-MODEL_ID = "eleven_turbo_v2_5"         # Modelo com melhor suporte para português
+MODEL_ID = "eleven_multilingual_v1"         # Modelo multilingual v1
 LANGUAGE_CODE = "pt-BR"                     # Forçar português brasileiro
 OUTPUT_FORMAT = "mp3_44100_128"            # MP3 a 44 kHz/128 kbps
 # -------------------------------------------------------------------
@@ -60,11 +60,18 @@ async def text_to_speech(text: str) -> bytes:
             "speed": 1.12
         }
     }
+
+    # Log das configurações sendo usadas
+    logger.info(f"Gerando áudio com: Modelo={MODEL_ID}, Voice={VOICE_ID}")
+    logger.info(f"Configurações de voz: {payload['voice_settings']}")
     
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=payload) as response:
                 if response.status == 200:
+                    # Log de sucesso
+                    logger.info("Áudio gerado com sucesso!")
+                    
                     # Receber o áudio em MP3
                     audio_mp3 = await response.read()
                     
