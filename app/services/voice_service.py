@@ -9,34 +9,39 @@ import re
 
 logger = logging.getLogger(__name__)
 
+# -------------------------------------------------------------------
+# Configurações fixas
+VOICE_ID = "ie5yJLYeLpsuijLaojmF"          # Voz profissional da Karol
+MODEL_ID = "eleven_turbo_v2_5"             # Garante enforcement de idioma
+LANGUAGE_CODE = "pt"                       # ISO-639-1
+OUTPUT_FORMAT = "mp3_44100_128"            # MP3 a 44 kHz/128 kbps
+# -------------------------------------------------------------------
+
 def format_multilingual_text(text: str) -> str:
     """
-    Formata o texto para melhor pronúncia em diferentes idiomas.
-    Detecta palavras em inglês e as marca apropriadamente.
+    Marca trechos em inglês para pronúncia correta.
+    Ex.: Como se diz "table" em inglês? -> Como se diz [English: table] em inglês?
     """
-    # Padrão para detectar frases que são traduções
-    translation_pattern = r'(?i)(?:em inglês|in english|como (se )?diz|how (do you )?say|tradução|translation|significa).*?[?:]?\s*["""]?([^"""\n]+)["""]?'
+    pattern = (
+        r'(?i)(?:em inglês|in english|como (se )?diz|how (do you )?say|'
+        r'tradução|translation|significa).*?[?:]?\s*["""]?([^"""\n]+)["""]?'
+    )
     
-    def format_match(match):
-        # Pega a frase em inglês
+    def repl(match):
         english_part = match.group(3).strip()
-        # Adiciona marcadores para melhorar a pronúncia
-        return f"{match.group(0).replace(english_part, f'[English: {english_part}]')}"
+        return match.group(0).replace(english_part, f'[English: {english_part}]')
     
-    # Aplica a formatação
-    formatted_text = re.sub(translation_pattern, format_match, text)
-    return formatted_text
+    return re.sub(pattern, repl, text)
 
 async def text_to_speech(text: str) -> bytes:
     """
     Converte texto para áudio usando ElevenLabs.
     Retorna os bytes do áudio em formato OGG.
     """
-    # Envie o texto puro em português para evitar confusão de idioma
-    formatted_text = text
+    # Formata o texto para lidar com palavras em inglês
+    formatted_text = format_multilingual_text(text)
     
-    # Voice ID para voz em português brasileiro
-    url = "https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB"
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
     
     headers = {
         "Accept": "audio/mpeg",
@@ -46,15 +51,16 @@ async def text_to_speech(text: str) -> bytes:
     
     payload = {
         "text": formatted_text,
-        "model_id": "eleven_multilingual_v2",
+        "model_id": MODEL_ID,
+        "language_code": LANGUAGE_CODE,
+        "output_format": OUTPUT_FORMAT,
         "voice_settings": {
             "stability": 0.85,  # Aumentado para mais estabilidade
             "similarity_boost": 0.75,  # Ajustado para manter características da voz
             "style": 0.35,
             "use_speaker_boost": True,
             "speed": 1.12
-        },
-        "language_code": "pt-BR"  # Forçar português brasileiro
+        }
     }
     
     try:
@@ -73,9 +79,12 @@ async def text_to_speech(text: str) -> bytes:
                     ogg_path = mp3_path.replace('.mp3', '.ogg')
                     
                     try:
-                        # Converter MP3 para OGG usando ffmpeg
+                        # Converter MP3 para OGG usando ffmpeg com configurações otimizadas
                         subprocess.run(
-                            ['ffmpeg', '-i', mp3_path, '-c:a', 'libvorbis', '-q:a', '4', ogg_path],
+                            ['ffmpeg', '-loglevel', 'error',
+                             '-i', mp3_path,
+                             '-c:a', 'libvorbis', '-q:a', '4',
+                             ogg_path],
                             check=True, capture_output=True
                         )
                         
@@ -90,11 +99,12 @@ async def text_to_speech(text: str) -> bytes:
                         raise Exception("Erro na conversão do áudio")
                     finally:
                         # Limpar arquivos temporários
-                        try:
-                            os.remove(mp3_path)
-                            os.remove(ogg_path)
-                        except:
-                            pass
+                        for p in (mp3_path, ogg_path):
+                            if os.path.exists(p):
+                                try:
+                                    os.remove(p)
+                                except:
+                                    pass
                 else:
                     error_text = await response.text()
                     logger.error(f"Erro ao gerar áudio: {error_text}")
