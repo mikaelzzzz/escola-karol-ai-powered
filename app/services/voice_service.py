@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------
 # Configurações fixas
 VOICE_ID = "ie5yJLYeLpsuijLaojmF"          # Voz profissional da Karol
-MODEL_ID = "eleven_turbo_v2_5"             # Garante enforcement de idioma
-LANGUAGE_CODE = "pt"                       # ISO-639-1
+MODEL_ID = "eleven_turbo_v2_5"         # Modelo com melhor suporte para português
+LANGUAGE_CODE = "pt-BR"                     # Forçar português brasileiro
 OUTPUT_FORMAT = "mp3_44100_128"            # MP3 a 44 kHz/128 kbps
 # -------------------------------------------------------------------
 
@@ -52,11 +52,9 @@ async def text_to_speech(text: str) -> bytes:
     payload = {
         "text": formatted_text,
         "model_id": MODEL_ID,
-        "language_code": LANGUAGE_CODE,
-        "output_format": OUTPUT_FORMAT,
         "voice_settings": {
             "stability": 0.85,  # Aumentado para mais estabilidade
-            "similarity_boost": 0.75,  # Ajustado para manter características da voz
+            "similarity_boost": 0.85,  # Aumentado para manter mais características da voz original
             "style": 0.35,
             "use_speaker_boost": True,
             "speed": 1.12
