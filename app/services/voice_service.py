@@ -5,16 +5,38 @@ import subprocess
 import base64
 from app.core.config import settings
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+def format_multilingual_text(text: str) -> str:
+    """
+    Formata o texto para melhor pronúncia em diferentes idiomas.
+    Detecta palavras em inglês e as marca apropriadamente.
+    """
+    # Padrão para detectar frases que são traduções
+    translation_pattern = r'(?i)(?:em inglês|in english|como (se )?diz|how (do you )?say|tradução|translation|significa).*?[?:]?\s*["""]?([^"""\n]+)["""]?'
+    
+    def format_match(match):
+        # Pega a frase em inglês
+        english_part = match.group(3).strip()
+        # Adiciona marcadores para melhorar a pronúncia
+        return f"{match.group(0).replace(english_part, f'[English: {english_part}]')}"
+    
+    # Aplica a formatação
+    formatted_text = re.sub(translation_pattern, format_match, text)
+    return formatted_text
 
 async def text_to_speech(text: str) -> bytes:
     """
     Converte texto para áudio usando ElevenLabs.
     Retorna os bytes do áudio em formato OGG.
     """
+    # Formata o texto para lidar com múltiplos idiomas
+    formatted_text = format_multilingual_text(text)
+    
     # Karol Pro Voice
-    url = "https://api.elevenlabs.io/v1/text-to-speech/ie5yJLYeLpsuijLaojmF"
+    url = "https://api.elevenlabs.io/v2git/text-to-speech/ie5yJLYeLpsuijLaojmF"
     
     headers = {
         "Accept": "audio/mpeg",
@@ -23,14 +45,14 @@ async def text_to_speech(text: str) -> bytes:
     }
     
     payload = {
-        "text": text,
+        "text": formatted_text,
         "model_id": "eleven_multilingual_v2",
         "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.95,
-            "style": 0,
+            "stability": 0.75,
+            "similarity_boost": 0.85,
+            "style": 0.35,
             "use_speaker_boost": True,
-            "speed": 1.12
+            "speed": 1.12  # Voltando para velocidade mais rápida conforme solicitado
         }
     }
     
